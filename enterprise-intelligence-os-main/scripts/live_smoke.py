@@ -43,7 +43,7 @@ def browser_checks():
         expect(page.get_by_text("demo-sales.csv").first).to_be_visible(timeout=30000)
         page.get_by_role("button",name=re.compile("الذكاء")).first.click()
         page.get_by_role("button",name=re.compile("شغّل التحليل")).first.click()
-        expect(page.get_by_text("تقرير الذكاء الإداري").first).to_be_visible(timeout=30000)
+        expect(page.get_by_role("heading",name="تقرير ذكاء الأعمال التنفيذي")).to_be_visible(timeout=30000)
         if errors:
             raise AssertionError("Uncaught browser errors:\n"+"\n".join(errors))
         browser.close()
