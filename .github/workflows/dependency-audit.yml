@@ -1,0 +1,38 @@
+name: Production dependency security audit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: enterprise-intelligence-os-main/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: enterprise-intelligence-os-main/frontend/package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Inspect production advisories without masking failures
+        shell: bash
+        run: |
+          npm audit --omit=dev --json > audit-report.json || true
+          node - <<'NODE'
+          const fs = require("fs");
+          const data = JSON.parse(fs.readFileSync("audit-report.json", "utf8"));
+          const items = Object.entries(data.vulnerabilities || {})
+            .filter(([,x]) => ["high","critical"].includes(x.severity))
+            .map(([name,x]) => ({name, severity:x.severity, direct:x.isDirect, fix:x.fixAvailable, range:x.range, via:x.via}));
+          console.log(JSON.stringify({counts:data.metadata?.vulnerabilities, significant:items}, null, 2));
+          if (items.length) process.exit(1);
+          NODE
