@@ -47,3 +47,40 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  live-nextjs-chromium:
+    runs-on: ubuntu-latest
+    env:
+      BACKEND_API_URL: http://127.0.0.1:8000
+      EIOS_DB_PATH: /tmp/enterprise-smoke.db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: python -m pip install -r enterprise-intelligence-os-main/backend/requirements.txt 'playwright>=1.51,<2'
+      - run: python -m playwright install --with-deps chromium
+      - run: npm ci
+        working-directory: enterprise-intelligence-os-main/frontend
+      - name: Launch real services and complete evidence-based browser journey
+        shell: bash
+        run: |
+          (cd enterprise-intelligence-os-main && python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000) >/tmp/enterprise-api.log 2>&1 &
+          (cd enterprise-intelligence-os-main/frontend && npm run dev) >/tmp/enterprise-ui.log 2>&1 &
+          trap 'cat /tmp/enterprise-api.log /tmp/enterprise-ui.log' EXIT
+          python - <<'PY'
+          import time,urllib.request
+          for _ in range(90):
+              try:
+                  urllib.request.urlopen("http://127.0.0.1:8000/api/health",timeout=2)
+                  urllib.request.urlopen("http://127.0.0.1:3000/api/health",timeout=2)
+                  break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise RuntimeError("Next.js or FastAPI did not become ready")
+          PY
+          python enterprise-intelligence-os-main/scripts/live_smoke.py
