@@ -1,1 +1,14 @@
 .env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+node_modules/
+.next/
+dist/
+coverage/
+*.tsbuildinfo
+*.db
+*.sqlite
+*.sqlite3
+.DS_Store
