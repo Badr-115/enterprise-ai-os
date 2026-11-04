@@ -38,7 +38,7 @@ def browser_checks():
         page.on("pageerror",lambda exc: errors.append(str(exc)))
         page.goto("http://localhost:3000/",wait_until="domcontentloaded",timeout=60000)
         expect(page.get_by_role("navigation",name="التنقل الرئيسي")).to_be_visible(timeout=20000)
-        page.get_by_role("button",name=re.compile("افتح مساحة البيانات")).first.click()
+        page.get_by_role("navigation",name="التنقل الرئيسي").get_by_role("button",name=re.compile("مساحة البيانات")).click()
         page.get_by_role("button",name="جرّب بيانات نموذجية").click()
         expect(page.get_by_text("demo-sales.csv").first).to_be_visible(timeout=30000)
         page.get_by_role("button",name=re.compile("الذكاء")).first.click()
