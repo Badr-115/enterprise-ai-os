@@ -179,6 +179,11 @@ def export_question(question_id: str):
   document,
   headers={"Content-Disposition": f'attachment; filename="{question_id}-question.html"'},
  )
+def replay_task_for_request(previous: dict, req: TaskRequest):
+ if previous.get('dataset_id') != req.dataset_id or previous.get('prompt') != req.prompt:
+  raise HTTPException(409, 'Idempotency-Key was already used for a different request')
+ return previous
+
 @app.post('/api/tasks',response_model=TaskResponse)
 def task(req:TaskRequest, idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")):
  dataset_result=store.get_dataset(req.dataset_id)
@@ -186,12 +191,14 @@ def task(req:TaskRequest, idempotency_key: str | None = Header(default=None, ali
  if idempotency_key:
   if len(idempotency_key) > 200: raise HTTPException(400, 'Idempotency-Key is too long')
   previous = store.get_task_by_idempotency_key(idempotency_key)
-  if previous is not None: return previous
+  if previous is not None: return replay_task_for_request(previous, req)
  result=run_workflow(type('StoredDataset', (), dataset_result)(),req.prompt)
  item={'id':uuid.uuid4().hex,'dataset_id':req.dataset_id,'prompt':req.prompt,'status':result['status'],**result}
  inserted = store.save_task(item['id'], req.dataset_id, item, idempotency_key)
  if not inserted and idempotency_key:
-  return store.get_task_by_idempotency_key(idempotency_key) or item
+  previous = store.get_task_by_idempotency_key(idempotency_key)
+  if previous is not None: return replay_task_for_request(previous, req)
+  raise HTTPException(500, 'Unable to save task')
  return store.get_task(item['id']) or item
 @app.get('/api/tasks',response_model=list[TaskResponse])
 def tasks(): return store.list_tasks()
