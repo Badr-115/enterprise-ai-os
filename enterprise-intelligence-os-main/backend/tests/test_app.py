@@ -86,6 +86,17 @@ def test_task_contract_and_idempotency():
  assert first.json()['dataset_id']==dataset['id']
  assert first.json()['verification']['checked_claims']
 
+def test_idempotency_key_rejects_a_different_request():
+ first_dataset=client.post('/api/datasets/upload',files={'file':('first-idempotent.csv',CSV,'text/csv')}).json()
+ second_dataset=client.post('/api/datasets/upload',files={'file':('second-idempotent.csv',KNOWN_CSV,'text/csv')}).json()
+ headers={'Idempotency-Key':'conflicting-request'}
+ first=client.post('/api/tasks',json={'dataset_id':first_dataset['id'],'prompt':'Review performance'},headers=headers)
+ assert first.status_code==200
+ changed_prompt=client.post('/api/tasks',json={'dataset_id':first_dataset['id'],'prompt':'Review expenses'},headers=headers)
+ changed_dataset=client.post('/api/tasks',json={'dataset_id':second_dataset['id'],'prompt':'Review performance'},headers=headers)
+ assert changed_prompt.status_code==409
+ assert changed_dataset.status_code==409
+
 def test_missing_resources_use_error_contract():
  response=client.get('/api/datasets/missing-dataset')
  assert response.status_code==404
